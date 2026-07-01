@@ -12,30 +12,30 @@ export default async function handler(req, res) {
   const GRAFANA_URL = "https://xplore.pustakadata.id";
   const TOKEN = process.env.GRAFANA_TOKEN;
 
-  async function fetchTimeseries(source, from, to, lucene) {
-    const { dsId, index, timeField } = source;
+  // async function fetchTimeseries(source, from, to, lucene) {
+  //   const { dsId, index, timeField } = source;
   
-    const must = [{ range: { [timeField]: { gte: from, lte: to } } }];
-    if (lucene && lucene !== "*") {
-      must.push({ query_string: { query: lucene } });
-    }
+  //   const must = [{ range: { [timeField]: { gte: from, lte: to } } }];
+  //   if (lucene && lucene !== "*") {
+  //     must.push({ query_string: { query: lucene } });
+  //   }
   
-    const body = {
-      size: 1,
-      query: { match_all: {} },
-    };
+  //   const body = {
+  //     size: 1,
+  //     query: { match_all: {} },
+  //   };
   
-    const msearchBody = JSON.stringify({ index }) + "\n" + JSON.stringify(body) + "\n";
+  //   const msearchBody = JSON.stringify({ index }) + "\n" + JSON.stringify(body) + "\n";
   
-    const response = await fetch(`${GRAFANA_URL}/api/datasources/proxy/${dsId}/_msearch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-ndjson", Authorization: TOKEN },
-      body: msearchBody,
-    });
+  //   const response = await fetch(`${GRAFANA_URL}/api/datasources/proxy/${dsId}/_msearch`, {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/x-ndjson", Authorization: TOKEN },
+  //     body: msearchBody,
+  //   });
   
-    const data = await response.json();
-    return data.responses?.[0] ?? { error: "no response" };
-  }
+  //   const data = await response.json();
+  //   return data.responses?.[0] ?? { error: "no response" };
+  // }
 
   const mustFilters = [
     { exists: { field: "fulltext" } },
@@ -105,7 +105,10 @@ export default async function handler(req, res) {
     stat: {
       size: 0,
       query: baseQuery(),
-      aggs: { kantor_berita: { cardinality: { field: "site.keyword" } } },
+      aggs: { 
+        kantor_berita: { cardinality: { field: "site.keyword" } },
+        total_berita: { cardinality: { field: "created" } }
+      },
     },
     // Kata Kunci dalam Berita
     tabel_kunci: {

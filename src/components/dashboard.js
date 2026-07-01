@@ -6,7 +6,7 @@ import {
 } from "recharts";
 
 // warna
-const COLORS = ["#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#14B8A6", "#F97316", "#84CC16", "#6366F1"];
+const COLORS = ["#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#7C3AED", "#EC4899", "#14B8A6", "#F97316", "#84CC16", "#6366F1"];
 const SENTIMEN_COLOR = { positif:"#10B981", netral:"#7C3AED", negatif:"#EF4444"};
 const EMOSI_COLOR = { Happy:   "#F59E0B", Sadness: "#7C3AED", Anger:   "#EF4444", Fear:    "#EC4899", Love:    "#F97316"};
 
@@ -82,13 +82,13 @@ function useESData(type, filters) {
 // Jumlah Berita & Sumber
 function StatPanel({ filters }) {
   const { data, loading } = useESData("stat", filters);
-  const jumlah = data?.hits?.total?.value ?? 0;
+  const jumlah = data?.aggregations?.total_berita?.value ?? 0;
   const kantor = data?.aggregations?.kantor_berita?.value ?? 0;
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <div className="bg-indigo-50 rounded-xl p-4 text-center">
-        <p className="text-2xl font-bold text-indigo-700">
+      <div className="bg-red-50 rounded-xl p-4 text-center">
+        <p className="text-2xl font-bold text-red-700">
           {loading ? "…" : jumlah >= 1000 ? `${(jumlah / 1000).toFixed(1)} K` : jumlah}
         </p>
         <p className="text-xs text-slate-500 mt-1">Jumlah Berita</p>
@@ -225,7 +225,7 @@ function TabelKunci({filters}) {
                 <td className="py-2 px-2 text-right">
                   {row.link !== "#" && (
                     <a href={row.link} target="_blank" rel="noreferrer"
-                      className="text-indigo-500 hover:text-indigo-700 underline">
+                      className="text-orange-500 hover:text-orange-700 underline">
                       buka ↗
                     </a>
                   )}
@@ -242,7 +242,7 @@ function TabelKunci({filters}) {
           {Array.from({ length: totalPages }, (_, i) => (
             <button key={i} onClick={() => setPage(i)}
               className={`w-6 h-6 rounded text-xs font-medium transition-colors
-                ${page === i ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                ${page === i ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
               {i + 1}
             </button>
           ))}
@@ -344,7 +344,7 @@ function NamaBeritaTabel({ filters }) {
                 <td className="py-2 px-2 text-right">
                   {row.link !== "#" && (
                     <a href={row.link} target="_blank" rel="noreferrer"
-                      className="text-indigo-500 hover:text-indigo-700 underline">
+                      className="text-orange-500 hover:text-orange-700 underline">
                       buka ↗
                     </a>
                   )}
@@ -360,7 +360,7 @@ function NamaBeritaTabel({ filters }) {
           {Array.from({ length: totalPages }, (_, i) => (
             <button key={i} onClick={() => setPage(i)}
               className={`w-6 h-6 rounded text-xs font-medium transition-colors
-                ${page === i ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                ${page === i ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
               {i + 1}
             </button>
           ))}
@@ -451,7 +451,7 @@ export default function DashboardContent({ filters }) {
   return (
     <main className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
 
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-6">
+      <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-red-100 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">✨</span>
           <h3 className="font-bold text-slate-800 text-lg">Intisari Hari Ini</h3>

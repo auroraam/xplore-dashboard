@@ -103,7 +103,7 @@ export default function DashboardHome() {
                   className="flex items-center gap-2 hover:bg-gray-100 px-2 py-1.5 rounded-xl transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-                       style={{ background: "linear-gradient(135deg, #7C3AED, #A78BFA)" }}>
+                       style={{ background: "linear-gradient(135deg, #EF4444, #F59E0B)" }}>
                     AM
                   </div>
                   <div className="text-left hidden sm:block">
@@ -119,7 +119,7 @@ export default function DashboardHome() {
                     <div className="px-4 py-3 border-b border-gray-50">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                             style={{ background: "linear-gradient(135deg, #7C3AED, #A78BFA)" }}>AM</div>
+                             style={{ background: "linear-gradient(135deg, #EF4444, #F59E0B)" }}>AM</div>
                         <div>
                           <p className="text-sm font-semibold text-gray-800">Aurora Ma'isyah</p>
                           <p className="text-xs text-gray-400">XPLORE</p>

@@ -27,7 +27,7 @@ function Card({ title, children, className = "" }) {
     <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden ${className}`}>
       {title && (
         <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+          <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
           <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
         </div>
       )}
@@ -194,7 +194,7 @@ export default function DashboardSentimen({ filters }) {
   return (
     <main className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
 
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-6">
+      <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-100 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">✨</span>
           <h3 className="font-bold text-slate-800 text-lg">Intisari Hari Ini</h3>
