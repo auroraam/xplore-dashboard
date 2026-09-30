@@ -134,7 +134,13 @@ export default function TimePicker({ filters, setFilters }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm"
+        className={`
+          flex items-center justify-between gap-2 bg-white border border-gray-200 text-gray-700 
+          px-3 py-2 rounded-xl text-xs font-medium outline-none cursor-pointer 
+          hover:bg-violet-50 hover:text-violet-600 hover:border-violet-300
+          transition-all shadow-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400
+          ${open ? 'ring-2 ring-violet-100 border-violet-400 bg-violet-50 text-violet-600' : ''}
+        `}
       >
         <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

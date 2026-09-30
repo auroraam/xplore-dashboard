@@ -6,10 +6,9 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
   const [menus, setMenus] = useState([
     { name: 'Utama', isBookmarked: false },
     { name: 'Sentimen', isBookmarked: false },
-    { name: 'Peta Aktor', isBookmarked: false },
+    { name: 'Aktor & Jaringan', isBookmarked: false },
     { name: 'Tren Isu', isBookmarked: false },
-    { name: 'Arus Berita', isBookmarked: false },
-    { name: 'Media Sosial', isBookmarked: false },
+    { name: 'Sumber Media', isBookmarked: false },
   ]);
 
   const toggleBookmark = (e, menuName) => {
@@ -108,24 +107,42 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
                         onClick={() => setActiveMenu(item.name)}
                         className={`group flex items-center justify-between py-2 pl-4 pr-3 rounded-xl cursor-pointer text-sm transition-all ${
                           activeMenu === item.name
-                            ? 'text-violet-700 font-semibold bg-violet-50'
+                            ? 'text-white font-semibold' /* <-- Ubah ke text-white di sini */
                             : 'text-gray-500 hover:text-violet-700 hover:bg-violet-50/60'
                         }`}
+                        /* 👇 Tambahkan inline style gradasi di sini 👇 */
+                        style={activeMenu === item.name
+                          ? { background: "linear-gradient(135deg, #7C3AED, #A78BFA)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }
+                          : {}}
                       >
                         <span>{item.name}</span>
+                        
+                        {/* Tombol Bookmark */}
                         <button
                           onClick={(e) => toggleBookmark(e, item.name)}
-                          className="p-1 hover:bg-violet-100 rounded-lg transition-colors"
+                          className={`p-1 rounded-lg transition-colors ${
+                            activeMenu === item.name ? 'hover:bg-white/20' : 'hover:bg-violet-100'
+                          }`}
                         >
                           {item.isBookmarked ? (
-                            <svg className="w-3.5 h-3.5 text-violet-600" fill="currentColor" viewBox="0 0 24 24">
+                            <svg 
+                              /* Biar ikon bookmark ikut putih kalau menu lagi aktif */
+                              className={`w-3.5 h-3.5 ${activeMenu === item.name ? 'text-white' : 'text-violet-600'}`} 
+                              fill="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
                               <path fillRule="evenodd" d="M5 4a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 20V4z" clipRule="evenodd" />
                             </svg>
                           ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                            <svg 
+                              className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                activeMenu === item.name ? 'text-white/70' : 'text-gray-300'
+                              }`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                             </svg>
                           )}
                         </button>
@@ -138,7 +155,7 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
           </div>
         </div>
 
-        <div className="p-4">
+        {/* <div className="p-4">
           <div className="rounded-2xl p-4 text-white text-xs"
                style={{ background: "linear-gradient(135deg, #7C3AED, #A78BFA)" }}>
             <p className="font-semibold mb-1">xPlore Pro</p>
@@ -147,7 +164,7 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
               Upgrade
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

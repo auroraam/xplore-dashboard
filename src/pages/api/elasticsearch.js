@@ -5,37 +5,13 @@ export default async function handler(req, res) {
     to = "now",
     topik = "$__all",
     sentimen = "$__all",
+    sdg = "$__all",
     lucene = "*",
   } = req.query;
 
   const DS_ID = 18;
   const GRAFANA_URL = "https://xplore.pustakadata.id";
   const TOKEN = process.env.GRAFANA_TOKEN;
-
-  async function fetchTimeseries(source, from, to, lucene) {
-    const { dsId, index, timeField } = source;
-  
-    const must = [{ range: { [timeField]: { gte: from, lte: to } } }];
-    if (lucene && lucene !== "*") {
-      must.push({ query_string: { query: lucene } });
-    }
-  
-    const body = {
-      size: 1,
-      query: { match_all: {} },
-    };
-  
-    const msearchBody = JSON.stringify({ index }) + "\n" + JSON.stringify(body) + "\n";
-  
-    const response = await fetch(`${GRAFANA_URL}/api/datasources/proxy/${dsId}/_msearch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-ndjson", Authorization: TOKEN },
-      body: msearchBody,
-    });
-  
-    const data = await response.json();
-    return data.responses?.[0] ?? { error: "no response" };
-  }
 
   const mustFilters = [
     { exists: { field: "fulltext" } },
@@ -47,6 +23,9 @@ export default async function handler(req, res) {
   }
   if (sentimen !== "$__all") {
     mustFilters.push({ term: { "sentiment.keyword": sentimen } });
+  }
+  if (sdg !== "$__all") {
+    mustFilters.push({ term: { "desc.keyword": sdg } });
   }
   if (lucene && lucene !== "*") {
     mustFilters.push({ query_string: { query: lucene } });
@@ -89,7 +68,7 @@ export default async function handler(req, res) {
     topik: {
       size: 0,
       query: baseQuery(),
-      aggs: { topik: { terms: { field: "topic.keyword", size: 5, order: { _count: "desc" } } } },
+      aggs: { topik: { terms: { field: "topic.keyword", size: 12, order: { _count: "desc" } } } },
     },
     nama: {
       size: 0,
@@ -104,8 +83,13 @@ export default async function handler(req, res) {
     // Jumlah Berita & Sumber
     stat: {
       size: 0,
+      track_total_hits: true,
       query: baseQuery(),
-      aggs: { kantor_berita: { cardinality: { field: "site.keyword" } } },
+      aggs: { 
+        kantor_berita: { cardinality: { field: "site.keyword" } },
+        total_organisasi: { cardinality: { field: "ners.organization.keyword"}},
+        kata_kunci_unik: { cardinality: { field: "phrases.keyword" }}
+      },
     },
     // Kata Kunci dalam Berita
     tabel_kunci: {
@@ -233,6 +217,127 @@ export default async function handler(req, res) {
       aggs: {
         topik_full: {
           terms: { field: "topic.keyword", size: 30, order: { _count: "desc" } },
+        },
+      },
+    },
+    // Pengaruh dalam SDG (Sustainable Development Goals)
+    sdg: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        sdg: {
+          terms: { field: "desc.keyword", size: 10, order: { _count: "desc" } },
+        },
+      },
+    },
+    // Perbedaan Media Lokal dan Mainstream
+    media_lokal_mainstream: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        jenis: {
+          terms: { field: "jenis.keyword", size: 2, order: { _count: "desc" } },
+          aggs: {
+            person: {
+              terms: { field: "ners.person.keyword", size: 6, order: { _count: "desc" } },
+            },
+          },
+        },
+      },
+    },
+    // Keyword
+    keyword_wordcloud: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        keyword_wordcloud: {
+          terms: {
+            field: "keywords.keyword",
+            size: 50,
+            min_doc_count: 4,
+            order: { _count: "desc" },
+          },
+        },
+      },
+    },
+    // Pie News — Banyaknya Artikel per Outlet
+    pie_news: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        pie_news: {
+          terms: {
+            field: "site.keyword",
+            size: 20,
+            order: { _count: "desc" },
+          },
+        },
+      },
+    },
+    sdg_list: {
+      size: 0,
+      query: { match_all: {} },
+      aggs: {
+        sdg_list: {
+          terms: { field: "desc.keyword", size: 20, order: { _key: "asc" } },
+        },
+      },
+    },
+    topik_list: {
+      size: 0,
+      query: { match_all: {} },
+      aggs: {
+        topik_list: {
+          terms: { field: "topic.keyword", size: 50, order: { _key: "asc" } },
+        },
+      },
+    },
+    berita_perhari: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        per_day: {
+          date_histogram: {
+            field: "created",
+            calendar_interval: "1d",
+            min_doc_count: 0,
+          },
+        },
+      },
+    },
+    sentimen_perhari: {
+      size: 0,
+      query: baseQuery(),
+      aggs: {
+        per_sentiment: {
+          terms: { field: "sentiment.keyword", size: 10 },
+          aggs: {
+            per_day: {
+              date_histogram: {
+                field: "created",
+                calendar_interval: "1d",
+                min_doc_count: 0,
+              },
+            },
+          },
+        },
+      },
+    },
+    emosi_perhari: {
+      size: 0,
+      query: baseQuery([], [{ term: { "emotion.keyword": "Neutral" } }]),
+      aggs: {
+        per_emosi: {
+          terms: { field: "emotion.keyword", size: 10 },
+          aggs: {
+            per_day: {
+              date_histogram: {
+                field: "created",
+                calendar_interval: "1d",
+                min_doc_count: 0,
+              },
+            },
+          },
         },
       },
     },
