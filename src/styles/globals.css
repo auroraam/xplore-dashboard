@@ -30,3 +30,26 @@ body {
   color: var(--foreground);
   /* Arial-nya kita buang dari sini biar dia otomatis ngikutin Tailwind */
 }
+
+@media print {
+  /* Memaksa elemen akar Next.js melepas batasan tinggi dan scroll */
+  html, body, #__next {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    position: static !important;
+    background-color: white !important;
+  }
+
+  /* Mengubah semua container flex/grid yang berpotensi memotong konten menjadi block normal */
+  .flex-1, .h-screen, .overflow-hidden, .overflow-auto {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Menghilangkan elemen bayangan dan background gradien agar cetakan bersih */
+  * {
+    box-shadow: none !important;
+  }
+}

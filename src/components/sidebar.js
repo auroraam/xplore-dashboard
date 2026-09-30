@@ -6,10 +6,9 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
   const [menus, setMenus] = useState([
     { name: 'Utama', isBookmarked: false },
     { name: 'Sentimen', isBookmarked: false },
-    { name: 'Peta Aktor', isBookmarked: false },
+    { name: 'Aktor & Jaringan', isBookmarked: false },
     { name: 'Tren Isu', isBookmarked: false },
-    { name: 'Arus Berita', isBookmarked: false },
-    { name: 'Media Sosial', isBookmarked: false },
+    { name: 'Sumber Media', isBookmarked: false },
   ]);
 
   const toggleBookmark = (e, menuName) => {
@@ -27,7 +26,7 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
 
         <div className="px-6 py-5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-               style={{ background: "linear-gradient(135deg, #F59E0B, #EF4444)" }}>
+               style={{ background: "linear-gradient(135deg, #7C3AED, #A78BFA)" }}>
             <img src="/grafana_icon.svg" alt="" className="w-5 h-5 brightness-200" />
           </div>
           <h1 className="text-base font-bold text-gray-900">xPlore</h1>
@@ -42,10 +41,10 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
                 <li
                   key={menu.name}
                   onClick={() => setActiveMenu(menu.name)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer hover:bg-red-50 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer hover:bg-violet-50 transition-colors"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                  <span className={`text-sm ${activeMenu === menu.name ? 'text-red-700 font-semibold' : 'text-gray-600'}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                  <span className={`text-sm ${activeMenu === menu.name ? 'text-violet-700 font-semibold' : 'text-gray-600'}`}>
                     {menu.name}
                   </span>
                 </li>
@@ -69,10 +68,10 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
                   activeMenu === 'Home'
                     ? 'text-white font-semibold'
-                    : 'text-gray-500 hover:bg-red-50 hover:text-red-700'
+                    : 'text-gray-500 hover:bg-violet-50 hover:text-violet-700'
                 }`}
                 style={activeMenu === 'Home'
-                  ? { background: "linear-gradient(135deg, #F59E0B, #EF4444)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }
+                  ? { background: "linear-gradient(135deg, #7C3AED, #A78BFA)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }
                   : {}}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" className="w-5 h-5 shrink-0" viewBox="0 0 640 640">
@@ -85,7 +84,7 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
                 <div
                   onClick={() => setIsDashboardOpen(!isDashboardOpen)}
                   className={`flex items-center justify-between px-3 py-2.5 cursor-pointer rounded-xl transition-colors ${
-                    isDashboardOpen ? 'bg-red-50 text-red-700' : 'text-gray-500 hover:bg-red-50 hover:text-red-700'
+                    isDashboardOpen ? 'bg-violet-50 text-violet-700' : 'text-gray-500 hover:bg-violet-50 hover:text-violet-700'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -108,24 +107,42 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
                         onClick={() => setActiveMenu(item.name)}
                         className={`group flex items-center justify-between py-2 pl-4 pr-3 rounded-xl cursor-pointer text-sm transition-all ${
                           activeMenu === item.name
-                            ? 'text-red-700 font-semibold bg-red-50'
-                            : 'text-gray-500 hover:text-red-700 hover:bg-red-50/60'
+                            ? 'text-white font-semibold' /* <-- Ubah ke text-white di sini */
+                            : 'text-gray-500 hover:text-violet-700 hover:bg-violet-50/60'
                         }`}
+                        /* 👇 Tambahkan inline style gradasi di sini 👇 */
+                        style={activeMenu === item.name
+                          ? { background: "linear-gradient(135deg, #7C3AED, #A78BFA)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }
+                          : {}}
                       >
                         <span>{item.name}</span>
+                        
+                        {/* Tombol Bookmark */}
                         <button
                           onClick={(e) => toggleBookmark(e, item.name)}
-                          className="p-1 hover:bg-red-100 rounded-lg transition-colors"
+                          className={`p-1 rounded-lg transition-colors ${
+                            activeMenu === item.name ? 'hover:bg-white/20' : 'hover:bg-violet-100'
+                          }`}
                         >
                           {item.isBookmarked ? (
-                            <svg className="w-3.5 h-3.5 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                            <svg 
+                              /* Biar ikon bookmark ikut putih kalau menu lagi aktif */
+                              className={`w-3.5 h-3.5 ${activeMenu === item.name ? 'text-white' : 'text-violet-600'}`} 
+                              fill="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
                               <path fillRule="evenodd" d="M5 4a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 20V4z" clipRule="evenodd" />
                             </svg>
                           ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                            <svg 
+                              className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                activeMenu === item.name ? 'text-white/70' : 'text-gray-300'
+                              }`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                             </svg>
                           )}
                         </button>
@@ -138,16 +155,16 @@ export default function Sidebar({ isOpen, activeMenu, setActiveMenu }) {
           </div>
         </div>
 
-        <div className="p-4">
+        {/* <div className="p-4">
           <div className="rounded-2xl p-4 text-white text-xs"
-               style={{ background: "linear-gradient(135deg, #F59E0B, #EF4444)" }}>
+               style={{ background: "linear-gradient(135deg, #7C3AED, #A78BFA)" }}>
             <p className="font-semibold mb-1">xPlore Pro</p>
             <p className="text-white/70 mb-3">Unlock full data access & analytics.</p>
-            <button className="bg-white text-red-700 font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+            <button className="bg-white text-violet-700 font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors">
               Upgrade
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

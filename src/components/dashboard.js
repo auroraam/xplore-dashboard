@@ -1,12 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie,
+  BarChart, Bar, Cell, PieChart, Pie, Area, AreaChart
 } from "recharts";
+import { geoMercator, geoPath } from "d3-geo";
+import PremiumPaywall from '@/components/landing';
+import IntisariAI from '@/components/intisariAI';
+import { feature } from "topojson-client";
 
 // warna
-const COLORS = ["#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#7C3AED", "#EC4899", "#14B8A6", "#F97316", "#84CC16", "#6366F1"];
+const COLORS = ["#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#7C3AED", "#EC4899", "#14B8A6", "#F97316", "#84CC16", "#6366F1"];
 const SENTIMEN_COLOR = { positif:"#10B981", netral:"#7C3AED", negatif:"#EF4444"};
 const EMOSI_COLOR = { Happy:   "#F59E0B", Sadness: "#7C3AED", Anger:   "#EF4444", Fear:    "#EC4899", Love:    "#F97316"};
 
@@ -55,7 +59,7 @@ function useESData(type, filters) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const filtersKey = `${type}-${filters?.from}-${filters?.to}-${filters?.topik}-${filters?.sentimen}-${filters?.lucene}`;
+  const filtersKey = `${type}-${filters?.from}-${filters?.to}-${filters?.topik}-${filters?.sdg}-${filters?.sentimen}-${filters?.sdg}-${filters?.lucene}-${filters?._refreshTrigger}`;
 
   useEffect(() => {
     if (!filters?.from) return;
@@ -66,6 +70,7 @@ function useESData(type, filters) {
     params.append("to", filters.to ?? "now");
     params.append("topik", filters.topik ?? "$__all");
     params.append("sentimen", filters.sentimen ?? "$__all");
+    params.append("sdg", filters.sdg ?? "$__all");
     params.append("lucene", filters.lucene ?? "*");
 
     setLoading(true);
@@ -82,13 +87,15 @@ function useESData(type, filters) {
 // Jumlah Berita & Sumber
 function StatPanel({ filters }) {
   const { data, loading } = useESData("stat", filters);
-  const jumlah = data?.aggregations?.total_berita?.value ?? 0;
+  const jumlah = data?.hits?.total?.value ?? 0;
   const kantor = data?.aggregations?.kantor_berita?.value ?? 0;
+  const organisasi = data?.aggregations?.total_organisasi?.value ?? 0;
+  const kata_kunci = data?.aggregations?.kata_kunci_unik?.value ?? 0;
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="bg-red-50 rounded-xl p-4 text-center">
-        <p className="text-2xl font-bold text-red-700">
+    <div className="grid grid-cols-4 gap-4">
+      <div className="bg-indigo-50 rounded-xl p-4 text-center">
+        <p className="text-2xl font-bold text-indigo-700">
           {loading ? "…" : jumlah >= 1000 ? `${(jumlah / 1000).toFixed(1)} K` : jumlah}
         </p>
         <p className="text-xs text-slate-500 mt-1">Jumlah Berita</p>
@@ -99,13 +106,27 @@ function StatPanel({ filters }) {
         </p>
         <p className="text-xs text-slate-500 mt-1">Kantor Berita</p>
       </div>
+      <div className="bg-indigo-50 rounded-xl p-4 text-center">
+        <p className="text-2xl font-bold text-indigo-700">
+          {loading ? "…" : organisasi >= 1000 ? `${(organisasi / 1000).toFixed(2)} K` : organisasi}
+        </p>
+        <p className="text-xs text-slate-500 mt-1">Jumlah Organisasi</p>
+      </div>
+      <div className="bg-emerald-50 rounded-xl p-4 text-center">
+        <p className="text-2xl font-bold text-emerald-700">
+          {loading ? "…" : kata_kunci >= 1000 ? `${(kata_kunci / 1000).toFixed(2)} K` : kata_kunci}
+        </p>
+        <p className="text-xs text-slate-500 mt-1">Kata Kunci Unik</p>
+      </div>
     </div>
   );
 }
 
-// Evolusi Kata Kunci / Isu
+// Evolusi Kata Kunci
 function EvolusiChart({filters}) {
   const { data, loading, error } = useESData("evolusi", filters);
+  
+  const [activeLine, setActiveLine] = useState(null); 
 
   if (loading) return <Skeleton h="h-72" />;
   if (error) return <p className="text-red-400 text-xs">{error}</p>;
@@ -130,395 +151,516 @@ function EvolusiChart({filters}) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <LineChart data={chartData}>
-        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        {buckets.map((phrase, i) => (
-          <Line
-            key={phrase.key}
-            type="monotone"
-            dataKey={phrase.key}
-            stroke={COLORS[i % COLORS.length]}
-            dot={false}
-            strokeWidth={2}
+    <div className="flex flex-col md:flex-row gap-6 w-full items-start">
+      
+      {/* 1. BAGIAN KIRI: CHART */}
+      <div className="flex-1 w-full min-w-0">
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData}>
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip content={<CustomTooltip />} />
+            
+            {buckets.map((phrase, i) => {
+              if (activeLine && activeLine !== phrase.key) return null;
+
+              return (
+                <Line
+                  key={phrase.key}
+                  type="monotone"
+                  dataKey={phrase.key}
+                  stroke={COLORS[i % COLORS.length]}
+                  dot={false}
+                  strokeWidth={2}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 2. BAGIAN KANAN: CUSTOM LEGEND & TOTAL */}
+      <div className="w-full md:w-64 shrink-0 flex flex-col max-h-[280px]">
+        
+        <div className="flex justify-between items-center text-blue-600 font-medium text-xs pb-2 border-b border-gray-200 px-1">
+          <span>Name</span>
+          <span>Total</span>
+        </div>
+
+        <div className="overflow-y-auto flex-1 pt-1 pr-1" style={{ scrollbarWidth: 'thin' }}>
+          {buckets.map((phrase, i) => {
+            
+            const isInactive = activeLine && activeLine !== phrase.key;
+
+            return (
+              <div 
+                key={phrase.key} 
+                onClick={() => setActiveLine(activeLine === phrase.key ? null : phrase.key)}
+                className={`flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0 cursor-pointer transition-all px-1 
+                  ${isInactive ? 'opacity-30 grayscale' : 'hover:bg-slate-50 opacity-100'}` // Bikin item lain memudar
+                }
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <span
+                    className="w-3.5 h-1 rounded-full shrink-0"
+                    style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  />
+                  <span 
+                    className="text-xs font-medium text-slate-700 truncate capitalize" 
+                    title={phrase.key}
+                  >
+                    {phrase.key}
+                  </span>
+                </div>
+                
+                <span className="text-xs font-semibold text-slate-700 ml-3">
+                  {phrase.doc_count || 0}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// GANTI seluruh fungsi decodeGeohash + PetaChart yang lama dengan ini
+// ════════════════════════════════════════════════════════════════════════
+
+function decodeGeohash(geohash) {
+  const BITS = [16, 8, 4, 2, 1];
+  const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+  let evenBit = true;
+  let latMin = -90, latMax = 90, lonMin = -180, lonMax = 180;
+  for (const char of geohash) {
+    const idx = BASE32.indexOf(char);
+    if (idx === -1) continue;
+    for (const mask of BITS) {
+      if (evenBit) {
+        const lonMid = (lonMin + lonMax) / 2;
+        if (idx & mask) lonMin = lonMid; else lonMax = lonMid;
+      } else {
+        const latMid = (latMin + latMax) / 2;
+        if (idx & mask) latMin = latMid; else latMax = latMid;
+      }
+      evenBit = !evenBit;
+    }
+  }
+  return { lat: (latMin + latMax) / 2, lon: (lonMin + lonMax) / 2 };
+}
+
+const LAT_MIN = -11, LAT_MAX = 6.5, LON_MIN = 94, LON_MAX = 142;
+const MAP_W = 600, MAP_H = 280;
+
+// ── Grid lines konfigurasi ────────────────────────────────────────────
+const LON_LINES = [95, 100, 105, 110, 115, 120, 125, 130, 135, 140];
+const LAT_LINES = [-10, -5, 0, 5];
+
+function PetaChart({ filters }) {
+  const { data, loading, error } = useESData("peta", filters);
+  const [hovered, setHovered] = useState(null);
+  const [topoData, setTopoData] = useState(null);
+
+  // ── Zoom & Pan state ──────────────────────────────────────────────
+  const [transform, setTransform] = useState({ scale: 1, tx: 0, ty: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const svgRef = useRef(null);
+
+  const MIN_SCALE = 1;
+  const MAX_SCALE = 8;
+
+  // Ambil Data GeoJSON langsung dari URL external yang sudah valid
+  useEffect(() => {
+    // Panggil file TopoJSON dari folder public
+    fetch("/indonesia-38-provinces.topo.json")
+      .then((res) => res.json())
+      .then((data) => setTopoData(data))
+      .catch((err) => console.error("Gagal memuat TopoJSON:", err));
+  }, []);
+
+  // Setup D3 Geo Projection
+  const { projection, pathGenerator, geoFeatures } = useMemo(() => {
+    if (!topoData) return { projection: null, pathGenerator: null, geoFeatures: [] };
+    
+    // 👇 KONVERSI TOPOJSON (sesuai artikel yang kamu temukan) 👇
+    const objectKey = Object.keys(topoData.objects)[0]; 
+    const provinces = feature(topoData, topoData.objects[objectKey]);
+
+    // Setup proyeksi peta (Manual center & scale agar koordinat titik beritamu tidak meleset)
+    const proj = geoMercator()
+      .center([118.0, -2.5]) 
+      .scale(680) // Atur angka ini kalau petanya kurang besar/kecil
+      .translate([MAP_W / 2, MAP_H / 2]); 
+      
+    const pathGen = geoPath().projection(proj);
+    
+    return { 
+      projection: proj, 
+      pathGenerator: pathGen,
+      geoFeatures: provinces.features // Ambil array features-nya untuk digambar
+    };
+  }, [topoData]);
+
+  // Fungsi helper untuk menerjemahkan lat/lon menjadi posisi x/y di layar
+  const getCoord = (lon, lat) => {
+    if (!projection) return { x: 0, y: 0 };
+    const [x, y] = projection([lon, lat]);
+    return { x, y };
+  };
+
+  // Zoom dengan scroll wheel
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return;
+
+    // Posisi kursor relatif ke SVG
+    const mouseX = ((e.clientX - svgRect.left) / svgRect.width) * MAP_W;
+    const mouseY = ((e.clientY - svgRect.top) / svgRect.height) * MAP_H;
+
+    const zoomFactor = e.deltaY < 0 ? 1.2 : 0.85;
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, transform.scale * zoomFactor));
+
+    // Zoom ke arah kursor
+    const newTx = mouseX - (mouseX - transform.tx) * (newScale / transform.scale);
+    const newTy = mouseY - (mouseY - transform.ty) * (newScale / transform.scale);
+
+    setTransform({ scale: newScale, tx: newTx, ty: newTy });
+  };
+
+  // Pan dengan drag
+  const handleMouseDown = (e) => {
+    if (e.target.tagName === "circle") return; // jangan drag kalau klik titik
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - transform.tx, y: e.clientY - transform.ty });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setTransform(prev => ({
+      ...prev,
+      tx: e.clientX - dragStart.x,
+      ty: e.clientY - dragStart.y,
+    }));
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  // Reset zoom
+  const resetZoom = () => setTransform({ scale: 1, tx: 0, ty: 0 });
+
+  if (loading) return <Skeleton h="h-80" />;
+  if (error) return <p className="text-red-400 text-xs">{error}</p>;
+
+  const buckets = data?.aggregations?.peta?.buckets ?? [];
+  const points = buckets.map((b) => {
+    const { lat, lon } = decodeGeohash(b.key);
+    return {
+      lat, lon,
+      count: b.doc_count,
+      judul: b.judul?.buckets?.[0]?.key ?? "-",
+      link: b.link?.buckets?.[0]?.key ?? "#",
+    };
+  });
+
+  const maxCount = Math.max(...points.map((p) => p.count), 1);
+
+  // Radius titik mengecil saat zoom in biar tidak numpuk
+  const dotRadius = (count) => {
+    const base = 3 + (count / maxCount) * 12;
+    return base / Math.sqrt(transform.scale);
+  };
+
+  return (
+    <div className="relative">
+      {/* Kontrol zoom */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+        <button
+          onClick={() => setTransform(p => ({
+            ...p,
+            scale: Math.min(MAX_SCALE, p.scale * 1.3),
+            tx: p.tx - (MAP_W * 0.15),
+            ty: p.ty - (MAP_H * 0.15),
+          }))}
+          className="w-7 h-7 bg-white border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 shadow text-sm font-bold flex items-center justify-center"
+        >+</button>
+        <button
+          onClick={() => setTransform(p => ({
+            ...p,
+            scale: Math.max(MIN_SCALE, p.scale * 0.77),
+            tx: p.tx + (MAP_W * 0.12),
+            ty: p.ty + (MAP_H * 0.12),
+          }))}
+          className="w-7 h-7 bg-white border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 shadow text-sm font-bold flex items-center justify-center"
+        >−</button>
+        <button
+          onClick={resetZoom}
+          className="w-7 h-7 bg-white border border-slate-200 rounded-md text-slate-500 hover:bg-slate-50 shadow text-xs flex items-center justify-center"
+          title="Reset zoom"
+        >⟳</button>
+      </div>
+
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+        className="w-full h-80 rounded-lg select-none"
+        style={{
+          background: "#dbeafe",
+          cursor: isDragging ? "grabbing" : "grab",
+        }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {/* Semua konten dalam group yang di-transform */}
+        <g transform={`translate(${transform.tx}, ${transform.ty}) scale(${transform.scale})`}
+          style={{ transformOrigin: "0 0" }}>
+
+          {/* ── Background laut ── */}
+          <rect
+            x={-MAP_W} y={-MAP_H}
+            width={MAP_W * 3} height={MAP_H * 3}
+            fill="#dbeafe"
           />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
 
-// Top 5 Topik Berita, Nama, Organisasi
-function HBarChart({ type, aggKey, color = "#6366f1", filters }) {
-  const { data, loading, error } = useESData(type, filters);
-  if (loading) return <Skeleton h="h-48" />;
-  if (error) return <p className="text-red-400 text-xs">{error}</p>;
+          {/* ── Grid garis koordinat ── */}
+          {LON_LINES.map((lon) => {
+            const { x } = getCoord(lon, 0); // Ambil X dari longitude
+            return (
+              <g key={`lon-${lon}`}>
+                <line x1={x} y1={-MAP_H} x2={x} y2={MAP_H * 2}
+                  stroke="#bfdbfe" strokeWidth={0.4 / transform.scale} strokeDasharray={`${3/transform.scale},${3/transform.scale}`} />
+                <text x={x} y={MAP_H - 2 / transform.scale} textAnchor="middle" fontSize={7 / transform.scale} fill="#60a5fa" fontFamily="monospace">
+                  {lon}°BT
+                </text>
+              </g>
+            );
+          })}
+          {LAT_LINES.map((lat) => {
+            const { y } = getCoord(115, lat); // Ambil Y dari latitude
+            const label = lat === 0 ? "0°" : lat > 0 ? `${lat}°LU` : `${Math.abs(lat)}°LS`;
+            return (
+              <g key={`lat-${lat}`}>
+                <line x1={-MAP_W} y1={y} x2={MAP_W * 2} y2={y}
+                  stroke="#bfdbfe" strokeWidth={0.4 / transform.scale} strokeDasharray={`${3/transform.scale},${3/transform.scale}`} />
+                <text x={2 / transform.scale} y={y - 2 / transform.scale} fontSize={7 / transform.scale} fill="#60a5fa" fontFamily="monospace">
+                  {label}
+                </text>
+              </g>
+            );
+          })}
 
-  const buckets = data?.aggregations?.[aggKey]?.buckets ?? [];
-  const chartData = buckets.map((b) => ({ name: b.key, jumlah: b.doc_count }));
-
-  return (
-    <ResponsiveContainer width="100%" height={180}>
-      <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
-        <XAxis type="number" tick={{ fontSize: 10 }} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} />
-        <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="jumlah" radius={[0, 4, 4, 0]}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          {/* ── Outline pulau ── */}
+          {geoFeatures.length > 0 && pathGenerator && geoFeatures.map((feat, i) => (
+            <path
+              key={`prov-${i}`}
+              d={pathGenerator(feat)}
+              fill="#d1fae5"
+              stroke="#6ee7b7"
+              strokeWidth={0.8 / transform.scale}
+            />
           ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
 
-// Kata Kunci dalam Berita
-function TabelKunci({filters}) {
-  const { data, loading, error } = useESData("tabel_kunci", filters);
-  const [page, setPage] = useState(0);
-  const PER_PAGE = 10;
 
-  if (loading) return <Skeleton h="h-64" />;
-  if (error) return <p className="text-red-400 text-xs">{error}</p>;
+          {/* ── Titik berita ── */}
+          {points.map((p, i) => {
+            // Gunakan getCoord agar letak titik jatuh persis di atas GeoJSON
+            const { x, y } = getCoord(p.lon, p.lat);
+            const r = dotRadius(p.count);
+            const isHovered = hovered?.judul === p.judul;
+            
+            return (
+              <g key={i}>
+                {isHovered && (
+                  <circle cx={x} cy={y} r={r + 4 / transform.scale} fill="#6366f1" fillOpacity={0.2} />
+                )}
+                <circle
+                  cx={x} cy={y} r={r}
+                  fill="#6366f1"
+                  fillOpacity={isHovered ? 0.95 : 0.65}
+                  stroke="white"
+                  strokeWidth={0.8 / transform.scale}
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() => setHovered(p)}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => p.link !== "#" && window.open(p.link, "_blank")}
+                />
+              </g>
+            );
+          })}
+        </g>
+      </svg>
 
-  const buckets = data?.aggregations?.per_phrase?.buckets ?? [];
-  const rows = buckets.map((b) => ({
-    kata_kunci: b.key,
-    judul: b.judul?.buckets?.[0]?.key ?? "-",
-    sentiment: b.sentiment?.buckets?.[0]?.key ?? "-",
-    link: b.link?.buckets?.[0]?.key ?? "#",
-    jumlah: b.doc_count,
-  }));
+      {/* Tooltip hover */}
+      {hovered && (
+        <div className="absolute bottom-10 left-2 bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs text-xs z-10 pointer-events-none">
+          <p className="font-semibold text-slate-700 mb-1">
+            {hovered.count.toLocaleString()} berita
+          </p>
+          <p className="text-slate-500 mb-1">
+            {hovered.lat.toFixed(2)}° {hovered.lat >= 0 ? "LU" : "LS"} ·{" "}
+            {hovered.lon.toFixed(2)}° BT
+          </p>
+          <p className="text-slate-600 line-clamp-2">{hovered.judul}</p>
+          {hovered.link !== "#" && (
+            <a href={hovered.link} target="_blank" rel="noreferrer"
+              className="text-indigo-500 hover:underline mt-1 inline-block pointer-events-auto">
+              buka ↗
+            </a>
+          )}
+        </div>
+      )}
 
-  const paged = rows.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
-  const totalPages = Math.ceil(rows.length / PER_PAGE);
-
-  const sentimenBadge = (s) => {
-    const cls = s === "positif" ? "bg-emerald-100 text-emerald-700"
-      : s === "negatif" ? "bg-red-100 text-red-700"
-      : "bg-slate-100 text-slate-600";
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{s}</span>;
-  };
-
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Kata Kunci</th>
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Judul</th>
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Sentimen</th>
-              <th className="text-right py-2 px-2 text-slate-500 font-medium">Link</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((row, i) => (
-              <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                <td className="py-2 px-2 font-medium text-slate-800">{row.kata_kunci}</td>
-                <td className="py-2 px-2 text-slate-600 max-w-xs truncate">{row.judul}</td>
-                <td className="py-2 px-2">{sentimenBadge(row.sentiment)}</td>
-                <td className="py-2 px-2 text-right">
-                  {row.link !== "#" && (
-                    <a href={row.link} target="_blank" rel="noreferrer"
-                      className="text-orange-500 hover:text-orange-700 underline">
-                      buka ↗
-                    </a>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {/* Pagination */}
-      <div className="flex items-center justify-between mt-3">
-        <span className="text-xs text-slate-400">{rows.length} kata kunci</span>
-        <div className="flex gap-1">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i)}
-              className={`w-6 h-6 rounded text-xs font-medium transition-colors
-                ${page === i ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-              {i + 1}
-            </button>
-          ))}
+      {/* Footer info */}
+      <div className="flex items-center justify-between mt-2 px-1">
+        <p className="text-xs text-slate-400">
+          {points.length} lokasi · scroll untuk zoom · drag untuk geser
+        </p>
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-400 inline-block" />
+            Daratan
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
+            Titik berita
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-// Kata Kunci atau Isu dalam Berita
-function WordCloud({ filters }) {
-  const { data, loading, error } = useESData("wordcloud", filters);
+function BeritaPerHariChart({ filters }) {
+  const { data, loading, error } = useESData("berita_perhari", filters);
 
-  if (loading) return <Skeleton h="h-64" />;
+  if (loading) return <Skeleton h="h-40" />;
   if (error) return <p className="text-red-400 text-xs">{error}</p>;
 
-  const buckets = data?.aggregations?.wordcloud?.buckets ?? [];
+  const buckets = data?.aggregations?.per_day?.buckets ?? [];
   if (buckets.length === 0) return <p className="text-xs text-slate-400">Tidak ada data</p>;
 
-  const maxCount = buckets[0]?.doc_count ?? 1;
-  const minCount = buckets[buckets.length - 1]?.doc_count ?? 1;
-
-  const fontSize = (count) => {
-    if (maxCount === minCount) return 16;
-    const t = (count - minCount) / (maxCount - minCount);
-    return 11 + t * 26; 
-  };
-
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 p-4 min-h-[220px]">
-      {buckets.map((b, i) => (
-        <span
-          key={i}
-          style={{
-            fontSize: `${fontSize(b.doc_count)}px`,
-            color: COLORS[i % COLORS.length],
-            fontWeight: b.doc_count > maxCount * 0.5 ? 700 : 500,
-            lineHeight: 1.1,
-          }}
-          className="cursor-default hover:opacity-70 transition-opacity"
-          title={`${b.key}: ${b.doc_count} berita`}
-        >
-          {b.key}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// Nama dan Berita
-function NamaBeritaTabel({ filters }) {
-  const { data, loading, error } = useESData("nama_berita", filters);
-  const [page, setPage] = useState(0);
-  const PER_PAGE = 10;
-
-  if (loading) return <Skeleton h="h-64" />;
-  if (error) return <p className="text-red-400 text-xs">{error}</p>;
-
-  const buckets = data?.aggregations?.per_person?.buckets ?? [];
-  const rows = buckets.map((b) => ({
-    nama: b.key,
-    judul: b.judul?.buckets?.[0]?.key ?? "-",
-    topik: b.topik?.buckets?.[0]?.key ?? "-",
-    sentiment: b.sentiment?.buckets?.[0]?.key ?? "-",
-    link: b.link?.buckets?.[0]?.key ?? "#",
+  const chartData = buckets.map(b => ({
+    date: b.key_as_string?.slice(5, 10), // MM-DD
     jumlah: b.doc_count,
   }));
-
-  const paged = rows.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
-  const totalPages = Math.ceil(rows.length / PER_PAGE);
-
-  const sentimenBadge = (s) => {
-    const cls = s === "positif" ? "bg-emerald-100 text-emerald-700"
-      : s === "negatif" ? "bg-red-100 text-red-700"
-      : "bg-slate-100 text-slate-600";
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{s}</span>;
-  };
-
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Nama</th>
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Judul</th>
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Topik</th>
-              <th className="text-left py-2 px-2 text-slate-500 font-medium">Sentimen</th>
-              <th className="text-right py-2 px-2 text-slate-500 font-medium">Link</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((row, i) => (
-              <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                <td className="py-2 px-2 font-medium text-slate-800">{row.nama}</td>
-                <td className="py-2 px-2 text-slate-600 max-w-xs truncate">{row.judul}</td>
-                <td className="py-2 px-2 text-slate-600">{row.topik}</td>
-                <td className="py-2 px-2">{sentimenBadge(row.sentiment)}</td>
-                <td className="py-2 px-2 text-right">
-                  {row.link !== "#" && (
-                    <a href={row.link} target="_blank" rel="noreferrer"
-                      className="text-orange-500 hover:text-orange-700 underline">
-                      buka ↗
-                    </a>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex items-center justify-between mt-3">
-        <span className="text-xs text-slate-400">{rows.length} nama</span>
-        <div className="flex gap-1">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i)}
-              className={`w-6 h-6 rounded text-xs font-medium transition-colors
-                ${page === i ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-              {i + 1}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Top 5 Organisasi Berpengaruh dalam Berita
-function OrganisasiBerpengaruhChart({ filters }) {
-  const { data, loading, error } = useESData("organisasi_berpengaruh", filters);
-  if (loading) return <Skeleton h="h-56" />;
-  if (error) return <p className="text-red-400 text-xs">{error}</p>;
-
-  const buckets = data?.aggregations?.organisasi_berpengaruh?.buckets ?? [];
-  if (buckets.length === 0) return <p className="text-xs text-slate-400">Tidak ada data</p>;
 
   const total = buckets.reduce((s, b) => s + b.doc_count, 0);
-  const chartData = buckets.map((b) => ({ name: b.key, value: b.doc_count }));
+  const maxPerHari = Math.max(...buckets.map(b => b.doc_count));
+  const rataRata = Math.round(total / buckets.length);
 
   return (
-    <div className="flex items-center gap-6">
-      <ResponsiveContainer width={180} height={200}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            outerRadius={85}
-            dataKey="value"
-            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-            labelLine={false}
-          >
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v) => `${v} berita (${((v / total) * 100).toFixed(1)}%)`} />
-        </PieChart>
-      </ResponsiveContainer>
-
-      <div className="flex flex-col gap-2 flex-1 min-w-0">
-        {chartData.map((entry, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ background: COLORS[i % COLORS.length] }}
-            />
-            <span className="text-xs text-slate-600 truncate flex-1">{entry.name}</span>
-            <span className="text-xs font-semibold text-slate-800">{entry.value}</span>
-          </div>
-        ))}
+    <div>
+      {/* Stat ringkasan di atas chart */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* <div className="bg-indigo-50 rounded-lg p-3 text-center">
+          <p className="text-lg font-bold text-indigo-700">
+            {total >= 1000 ? `${(total / 1000).toFixed(1)}K` : total}
+          </p>
+          <p className="text-xs text-slate-500">Total Berita</p>
+        </div> */}
+        <div className="bg-emerald-50 rounded-lg p-3 text-center">
+          <p className="text-lg font-bold text-emerald-700">
+            {rataRata >= 1000 ? `${(rataRata / 1000).toFixed(1)}K` : rataRata}
+          </p>
+          <p className="text-xs text-slate-500">Rata-rata/Hari</p>
+        </div>
+        <div className="bg-amber-50 rounded-lg p-3 text-center">
+          <p className="text-lg font-bold text-amber-700">
+            {maxPerHari >= 1000 ? `${(maxPerHari / 1000).toFixed(1)}K` : maxPerHari}
+          </p>
+          <p className="text-xs text-slate-500">Tertinggi/Hari</p>
+        </div>
       </div>
+
+      {/* Area chart */}
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gradBerita" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="date" tick={{ fontSize: 9 }} />
+          <YAxis tick={{ fontSize: 9 }} width={40}
+            tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}K` : v} />
+          <Tooltip content={<CustomTooltip />} />
+          <Area
+            type="monotone"
+            dataKey="jumlah"
+            stroke="#6366f1"
+            strokeWidth={2}
+            fill="url(#gradBerita)"
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-// Top 10 Lokasi Berpengaruh dalam Berita
-function LokasiChart({ filters }) {
-  const { data, loading, error } = useESData("lokasi", filters);
-  if (loading) return <Skeleton h="h-64" />;
-  if (error) return <p className="text-red-400 text-xs">{error}</p>;
-
-  const buckets = data?.aggregations?.lokasi?.buckets ?? [];
-  if (buckets.length === 0) return <p className="text-xs text-slate-400">Tidak ada data</p>;
-
-  const chartData = buckets.map((b) => ({ name: b.key, jumlah: b.doc_count }));
-
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
-        <XAxis type="number" tick={{ fontSize: 10 }} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-        <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="jumlah" radius={[0, 4, 4, 0]}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-export default function DashboardContent({ filters }) {
+export default function DashboardContent({ filters, userRole, onOpenPlans }) {
   console.log("Current Filters State:", filters);
-  return (
-    <main className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
 
-      <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-red-100 rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl">✨</span>
-          <h3 className="font-bold text-slate-800 text-lg">Intisari Hari Ini</h3>
-        </div>
-        <p className="text-slate-600 leading-relaxed text-sm">
-          Area ini akan memuat ringkasan otomatis dari LLM tentang tren berita terkini,
-          metrik sentimen dominan, dan tokoh yang paling banyak dibicarakan hari ini.
-        </p>
+  return (
+    <main className="flex-1 overflow-y-auto p-6 space-y-6">
+
+      <div className="">
+        <Card>
+          {/* 2. Cek apakah user adalah Guest */}
+          {userRole === "Guest" ? (
+            
+            /* TAMPILAN MINI-PAYWALL KHUSUS AI */
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200">
+              <span className="text-3xl mb-3">✨</span>
+              <h3 className="text-sm font-bold text-slate-800 mb-1">Intisari AI Terkunci</h3>
+              <p className="text-xs text-slate-500 mb-4 max-w-sm">
+                Ringkasan otomatis menggunakan Gemini AI hanya tersedia untuk pengguna premium.
+              </p>
+              {/* Tombol yang memicu pop-up dari Bapaknya */}
+              <button 
+                onClick={onOpenPlans} 
+                className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-semibold px-5 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+              >
+                Upgrade Sekarang
+              </button>
+            </div>
+
+          ) : (
+            
+            /* JIKA SUDAH BAYAR, TAMPILKAN AI ASLINYA */
+            <IntisariAI filters={filters} section="utama" />
+            
+          )}
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="gap-6">
         <Card title="Jumlah Berita & Sumber">
           <StatPanel filters={filters} />
         </Card>
-        {/* <Card title="Sentimen dalam Berita">
-          <SentimenChart filters={filters} />
-        </Card>
-        <Card title="Emosi non Netral dalam Berita">
-          <EmosiChart filters={filters} />
-        </Card> */}
       </div>
+
+      <Card title="Rincian Berita per Hari">
+        <BeritaPerHariChart filters={filters} />
+      </Card>
 
       <Card title="Evolusi Kata Kunci / Isu">
         <EvolusiChart filters={filters} />
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card title="Top 5 Topik Berita">
-          <HBarChart type="topik" aggKey="topik" filters={filters} />
+      <div className="">
+        <Card title="Berita dalam Peta">
+          <PetaChart filters={filters} />
         </Card>
-        <Card title="Top 5 Nama">
-          <HBarChart type="nama" aggKey="nama" filters={filters} />
-        </Card>
-        <Card title="Top 5 Organisasi">
-          <HBarChart type="organisasi" aggKey="organisasi" filters={filters} />
-        </Card>
-      </div>
-
-      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card title="Sentimen Positif & Netral">
-          <TabelSentimen type="sentimen_positif" label="Positif/Netral" color="#10b981" filters={filters} />
-        </Card>
-        <Card title="Sentimen Negatif dalam Berita">
-          <TabelSentimen type="sentimen_negatif" label="Negatif" color="#ef4444" filters={filters} />
-        </Card>
-      </div> */}
-
-      <Card title="Kata Kunci dalam Berita (7 hari terakhir)">
-        <TabelKunci filters={filters} />
-      </Card>
-
-      <Card title="Kata Kunci atau Isu dalam Berita">
-        <WordCloud filters={filters} />
-      </Card>
-
-      <Card title="Nama dan Berita">
-        <NamaBeritaTabel filters={filters} />
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card title="Top 5 Organisasi Berpengaruh dalam Berita">
-          <OrganisasiBerpengaruhChart filters={filters} />
-        </Card>
-        <Card title="Top 10 Lokasi Berpengaruh dalam Berita">
-          <LokasiChart filters={filters} />
-        </Card>
-      </div>
+      </div>     
 
     </main>
   );
